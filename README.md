@@ -15,21 +15,21 @@ to enable dependency driven script and style loading
 
 ## Usage
 
-main file
+main file:
 
 	require.setObjUrl('jQuery', 'http://code.jquery.com/jquery-1.4.2.min.js');
 	require.setNsUrl('jQuery', function(name) { return 'http://cdn-' + ~~(Math.random()*4) + '.example/plugins/' + name + '.js'; });
 	require('jQuery.myplugin', function() { /* both have loaded when this executes */ })
 
-plugin file
+plugin file:
 
 	require('jQuery', function() {
 		jQuery.myplugin = ...
 	});
 
-require css
+equire css: Any requirement matching /\bcss\b/i will be treated as a css requirement.
 
-	requireCss('myplugin.css', function() { /* You can count on styles being available here */ });
+	require('myplugin.css', function() { /* You can count on styles being available here */ });
 
 ## License 
 
