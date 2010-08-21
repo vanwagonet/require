@@ -1,11 +1,11 @@
 /*!
- * _.require v0.9.1
+ * _.require v0.9.2
  *  Copyright 2010, Andy VanWagoner
  *  Released under the MIT, and BSD Licenses.
  **/
 (function(_) { _ = _ || window;
 	var obj_map = {}, ns_map = {}, root = [], reqs = {}, q = [], empty = function(){},
-		CREATED = 0, REQUESTED = 1, LOADED = 2, EXECUTED = 3, COMPLETE = 4,
+		REQUESTED = 1, LOADED = 2, EXECUTED = 3, COMPLETE = 4, is_css = /\bcss\b/i,
 		inOrder = !!(window.opera || document.getBoxObjectFor || window.mozInnerScreenX >= 0),
 		d = document, head = d.head || d.getElementsByTagName('head')[0] || d.documentElement;
 
@@ -21,8 +21,16 @@
 		return head.appendChild(s);
 	}
 
+	function link(req) { // create link and call complete on load.
+		var href = req.url, s = document.createElement('link'); s.rel = 'stylesheet'; s.type = 'text/css';
+		s.href = require.build ? href + (href.indexOf('?') < 0 ? '?' : '&') + require.build : href;
+		var load_t = setInterval(function() { return (s.sheet || s.styleSheet) && s.onload(); }, 100);
+		s.onload = function() { clearInterval(load_t); s.onload = null; return req.complete(); }
+		head.appendChild(s);
+	}
+
 	function Requirement(url) { // object to keep track of files required
-		this.url = url; this.listeners = []; this.status = CREATED; this.children = [];
+		this.url = url; this.listeners = []; this.status = 0; this.children = []; this.css = is_css.test(url);
 		return reqs[url] = this;
 	}
 
@@ -62,6 +70,7 @@
 			if (this.status >= REQUESTED) { return; }
 
 			this.status = REQUESTED;
+			if (this.css) { return link(this); }
             if (inOrder) { q.push(this); }
 			var r = this, type = inOrder ? 'text/javascript' : 'text/plain';
 			script(this.url, type, function() { return inOrder ? r.executed() : r.loaded(); });
@@ -86,14 +95,15 @@
 	} _.require = require;
 
 	function resolve(name) { // get url for object by name, pass through urls
-		if (/\/|\\|\?|#|\.js$/.test(name)) { return name; }
+		if (/\/|\\|\?|#|\.js$|\.css$/.test(name)) { return name; }
 		if (obj_map[name]) { return obj_map[name](name); }
-		var parts = name.split('.'), used = [ parts.pop() ], ns;
+		var ext = is_css.test(name) ? '.css' : '.js',
+			parts = name.split('.'), used = [ parts.pop() ];
 		while (parts.length) {
-			if (ns_map[ns = parts.join('.')]) { return ns_map[ns](ns) + used.reverse().join('/') + '.js'; }
+			if (ns_map[ns = parts.join('.')]) { return ns_map[ns](ns) + used.reverse().join('/') + ext; }
 			used.push(parts.pop());
 		}
-		return used.reverse().join('/') + '.js';
+		return used.reverse().join('/') + ext;
 	} require.resolve = resolve;
 
 	var div; (div = d.createElement('div')).innerHTML = '<a></a>';
@@ -129,16 +139,6 @@
 	function addObjMap(o) { for (var k in o) { obj_map[k] = makeFn(o[k]); } return this; }
 	function addNsMap (o) { for (var k in o) { ms_map[k]  = makeFn(o[k]); } return this; }
 	require.addObjMap = addObjMap; require.addNsMap = addNsMap;
-
-	function requireCss(href, onready) { // require css - only one url, no nested requires
-		var s = document.createElement('link'); s.rel = 'stylesheet'; s.type = 'text/css';
-		s.href = require.build ? href + (href.indexOf('?') < 0 ? '?' : '&') + require.build : href;
-		if (typeof onready === 'function') {
-			var load_t = setInterval(function() { return (s.sheet || s.styleSheet) && s.onload(); }, 100);
-			s.onload = function() { clearInterval(load_t); s.onload = null; return onready.call(_, href); }
-		}
-		head.appendChild(s);
-	} _.requireCss = requireCss;
 
 	require.tree  = root; // make the required tree available
 	require.build = 0;    // used to bust cache when a new site build occurs
