@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Require Tests</title>
+	<link rel="stylesheet" href="tests.css" />
+</head>
+<body>
+	<div id="initialize" class="test">uninitialized</div>
+	<script>(function(u,f){var d=document,l='onload',r='onreadystatechange',s=d.createElement('script');
+		s[l]=function(){s[l]&&(s[l]=s[r]=null)||f()};s[r]=function(){/le|de/.test(s.readyState)&&s[l]()};
+		s.async=true;s.src=u;(d.getElementsByTagName('head')[0]||d.documentElement).appendChild(s)})
+		('../require.js',function(){require('tests.js')})</script>
+</body>
+</html>

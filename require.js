@@ -16,7 +16,7 @@
 		s.src = require.build ? src + (src.indexOf('?') < 0 ? '?' : '&') + require.build : src;
 		function cleanup() { return s.onload && (s.onload = s.onerror = s.onreadystatechange = null) || head.removeChild(s); }
 		s.onload = function() { return cleanup() && ready(); }; // make sure event and cleanup happens only once
-		s.onreadystatechange = function() { if (s.readyState === 'complete' || s.readyState === 'loaded') { s.onload(); } };
+		s.onreadystatechange = function() { return (s.readyState.length % 2) || s.onload(); };
 		s.onerror = function() { reqs[src].failed = true; s.onload(); warn('failed to load: ' + src); }
 		return head.appendChild(s);
 	}
@@ -89,8 +89,8 @@
 	
 	function require(arr, onready) {
 		if (typeof arr === 'string') { arr = [ arr ]; } // make sure we have an array
-		var left = arr.length; if (!left && onready) { return onready.apply(_, arr); }
-		function check() { if (!--left && onready) { onready.apply(_, arr); } }
+		var left = arr.length; if (!left && onready) { return onready.apply(_, get(arr)); }
+		function check() { if (!--left && onready) { onready.apply(_, get(arr)); } }
 		return each(arr, function(req) { return req.request(check); });
 	} _.require = require;
 
@@ -98,7 +98,7 @@
 		if (/\/|\\|\?|#|\.js$|\.css$/.test(name)) { return name; }
 		if (obj_map[name]) { return obj_map[name](name); }
 		var ext = is_css.test(name) ? '.css' : '.js',
-			parts = name.split('.'), used = [ parts.pop() ];
+			parts = name.split('.'), used = [ parts.pop() ], ns;
 		while (parts.length) {
 			if (ns_map[ns = parts.join('.')]) { return ns_map[ns](ns) + used.reverse().join('/') + ext; }
 			used.push(parts.pop());
@@ -106,13 +106,22 @@
 		return used.reverse().join('/') + ext;
 	} require.resolve = resolve;
 
+	function get(names) {
+		var objs = [], k, n = names.length;
+		for (k = 0; k < n; ++k) {
+			var o = window, a = names[k].split('.'), i, l = a.length;
+			for (i = 0; i < l && o; ++i) { o = o[a[i]]; }
+			objs[k] = (i === l) ? o : names[k];
+		}
+		return objs;
+	}
+
 	var div; (div = d.createElement('div')).innerHTML = '<a></a>';
 	function absolutize(url) { // relative to absolute url
 		div.firstChild.href = url;
 		if (div.canHaveHTML) { div.innerHTML = div.innerHTML; } // run through the parser for IE
 		return div.firstChild.href;
 	} require.absolutize = absolutize;
-
 
 	function complete(arr) { // declare a class name or file complete
 		return each(arr, function(req) { return req.complete(true); });
@@ -137,7 +146,7 @@
 	require.setObjUrl = setObjUrl; require.setNsUrl = setNsUrl;
 
 	function addObjMap(o) { for (var k in o) { obj_map[k] = makeFn(o[k]); } return this; }
-	function addNsMap (o) { for (var k in o) { ms_map[k]  = makeFn(o[k]); } return this; }
+	function addNsMap (o) { for (var k in o) { ns_map[k]  = makeFn(o[k]); } return this; }
 	require.addObjMap = addObjMap; require.addNsMap = addNsMap;
 
 	require.tree  = root; // make the required tree available

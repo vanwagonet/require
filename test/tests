@@ -1,0 +1,30 @@
+(function(){
+	function $(id) { return document.getElementById(id); }
+
+	var tests = {};
+	function createTest(name) {
+		var div = $(name) || document.body.appendChild(document.createElement('div'));
+		div.id = name.replace(/\s+/g, '_');
+		div.className = 'test';
+		div.innerHTML = name;
+		div.assert = function(pass){ div.className += (pass ? ' pass' : ' fail'); };
+		return (tests[name] = div);
+	}
+
+	// test harness is in place
+	createTest('initialize').assert(true);
+
+	// test requiring css files
+	var test_css_1 = createTest('require css 1');
+	require('test-css-1.css', function(href){
+		test_css_1.assert(href === 'test-css-1.css' && $('require_css_1').offsetHeight == 25);
+	});
+
+	// test auto resolving object
+	var test_js_1 = createTest('require js 1');
+	require.setObjUrl('test.require.js', 'test-js-1.js');
+	require.setObjUrl('test.require.js.1', 'test-js-1.js');
+	require([ 'test.require.js', 'test.require.js.1' ], function(obj1, obj2){
+		test_js_1.assert(obj1 === test.require.js && obj2 === 1);
+	});
+})();
