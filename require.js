@@ -5,32 +5,43 @@
  **/
 (function(_) { _ = _ || window;
 	var obj_map = {}, ns_map = {}, root = [], reqs = {}, q = [], empty = function(){},
-		REQUESTED = 1, LOADED = 2, EXECUTED = 3, COMPLETE = 4, is_css = /\bcss\b/i,
+		REQUESTED = 1, LOADED = 2, EXECUTED = 3, COMPLETE = 4,
+		is_url = /:|#|\?|\/|\.(?:css|js|gif|jpe?g|png)$/i, is_css = /\.css$/i, is_img = /\.(?:gif|jpe?g|png)$/i,
 		inOrder = !!(window.opera || document.getBoxObjectFor || window.mozInnerScreenX >= 0),
 		d = document, head = d.head || d.getElementsByTagName('head')[0] || d.documentElement;
 
 	function warn(text) { return window.console && console.warn && console.warn(text); }
+	function add_b(url) { return require.build ? url + (url.indexOf('?') < 0 ? '?' : '&') + require.build : url; }
 
 	function script(src, type, ready) { // create script tag and add to head
-		var s = d.createElement('script'); s.type = type || 'text/javascript';
-		s.src = require.build ? src + (src.indexOf('?') < 0 ? '?' : '&') + require.build : src;
+		var s = d.createElement('script'); s.type = type || 'text/javascript'; s.src = add_b(src);
 		function cleanup() { return s.onload && (s.onload = s.onerror = s.onreadystatechange = null) || head.removeChild(s); }
 		s.onload = function() { return cleanup() && ready(); }; // make sure event and cleanup happens only once
-		s.onreadystatechange = function() { return (s.readyState.length % 2) || s.onload(); };
-		s.onerror = function() { reqs[src].failed = true; s.onload(); warn('failed to load: ' + src); }
+		s.onreadystatechange = function() { return (s.readyState.length % 2) || s.onload(); }; // loaded and complete have even lengths
+		s.onerror = function() { warn('failed to load: ' + src); reqs[src].failed = true; return s.onload(); }
 		return head.appendChild(s);
 	}
 
-	function link(req) { // create link and call complete on load.
-		var href = req.url, s = document.createElement('link'); s.rel = 'stylesheet'; s.type = 'text/css';
-		s.href = require.build ? href + (href.indexOf('?') < 0 ? '?' : '&') + require.build : href;
+	function link(req) { // create link and call complete on load
+		var s = document.createElement('link'); s.rel = 'stylesheet'; s.type = 'text/css'; s.href = add_b(req.url);
 		var load_t = setInterval(function() { return (s.sheet || s.styleSheet) && s.onload(); }, 100);
 		s.onload = function() { clearInterval(load_t); s.onload = null; return req.complete(); }
-		head.appendChild(s);
+		return head.appendChild(s);
 	}
 
-	function Requirement(url) { // object to keep track of files required
-		this.url = url; this.listeners = []; this.status = 0; this.children = []; this.css = is_css.test(url);
+	function img(req) { // create image and call complete on load
+		var img = new Image();
+		img.onload = function() { return req.complete(); };
+		img.src = add_b(req.url);
+		return img;
+	}
+
+	function Requirement(url, type) { // object to keep track of files required
+		this.url = url;
+		this.listeners = [];
+		this.status = 0;
+		this.children = [];
+		this.type = type;
 		return reqs[url] = this;
 	}
 
@@ -70,7 +81,10 @@
 			if (this.status >= REQUESTED) { return; }
 
 			this.status = REQUESTED;
-			if (this.css) { return link(this); }
+
+			if (this.type === 'css') { return link(this); }
+			if (this.type === 'img') { return img(this); }
+
             if (inOrder) { q.push(this); }
 			var r = this, type = inOrder ? 'text/javascript' : 'text/plain';
 			script(this.url, type, function() { return inOrder ? r.executed() : r.loaded(); });
@@ -81,12 +95,13 @@
 		if (typeof arr === 'string') { arr = [ arr ]; } // make sure we have an array
 		var i = arr.length;
 		while (i) { // update or create the requirement node
-			var url = absolutize(resolve(arr[--i]));
-			fn(reqs[url] || new Requirement(url));
+			var url  = absolutize(resolve(arr[--i])),
+				type = is_css.test(arr[i]) ? 'css' : (is_img.test(arr[i]) ? 'img' : 'js');
+			fn(reqs[url] || new Requirement(url, type));
 		}
 		return _;
 	}
-	
+
 	function require(arr, onready) {
 		if (typeof arr === 'string') { arr = [ arr ]; } // make sure we have an array
 		var left = arr.length; if (!left && onready) { return onready.apply(_, get(arr)); }
@@ -95,23 +110,24 @@
 	} _.require = require;
 
 	function resolve(name) { // get url for object by name, pass through urls
-		if (/\/|\\|\?|#|\.js$|\.css$/.test(name)) { return name; }
+		if (is_url.test(name)) { return name; } // css and img should always be urls
 		if (obj_map[name]) { return obj_map[name](name); }
-		var ext = is_css.test(name) ? '.css' : '.js',
-			parts = name.split('.'), used = [ parts.pop() ], ns;
+		var parts = name.split('.'), used = [ parts.pop() ], ns;
 		while (parts.length) {
-			if (ns_map[ns = parts.join('.')]) { return ns_map[ns](ns) + used.reverse().join('/') + ext; }
+			if (ns_map[ns = parts.join('.')]) { return ns_map[ns](name); }
 			used.push(parts.pop());
 		}
-		return used.reverse().join('/') + ext;
+		if (ns_map['']) { return ns_map[''](name); }
+		return used.reverse().join('/') + '.js';
 	} require.resolve = resolve;
 
 	function get(names) {
 		var objs = [], k, n = names.length;
 		for (k = 0; k < n; ++k) {
+			if (is_url.test(names[k])) { continue; }
 			var o = window, a = names[k].split('.'), i, l = a.length;
 			for (i = 0; i < l && o; ++i) { o = o[a[i]]; }
-			objs[k] = (i === l) ? o : names[k];
+			objs[k] = (i === l) ? o : undefined;
 		}
 		return objs;
 	}

@@ -16,16 +16,16 @@
 
 	// test name to url resolution
 	require.addObjMap({ 'test.resolve.fn':function(n) { return 'fn'; }, 'test.resolve.url':'url' });
-	require.addNsMap({ 'test.resolve':function(n) { return 'ns/'; } });
+	require.addNsMap({ 'test.resolve':function(n) { return 'ns/' + n + '.js'; } });
 	createTest('resolve name by string').assert(require.resolve('test.resolve.url') === 'url');
 	createTest('resolve name by function').assert(require.resolve('test.resolve.fn') === 'fn');
-	createTest('resolve name by namespace function 1').assert(require.resolve('test.resolve.js.name') === 'ns/js/name.js');
-	createTest('resolve name by namespace function 2').assert(require.resolve('test.resolve.css.name') === 'ns/css/name.css');
+	createTest('resolve name by namespace function 1').assert(require.resolve('test.resolve.js.name') === 'ns/test.resolve.js.name.js');
+	createTest('resolve name by namespace function 2').assert(require.resolve('test.resolve.css.name') === 'ns/test.resolve.css.name.js');
 
 	// test requiring css files
 	var test_css_1 = createTest('require css 1');
-	require('test-css-1.css', function(href){
-		test_css_1.assert(href === 'test-css-1.css' && $('require_css_1').offsetHeight == 25);
+	require('test-css-1.css', function(obj){
+		test_css_1.assert(obj === undefined && $('require_css_1').offsetHeight == 25);
 	});
 
 	// test auto resolving object
