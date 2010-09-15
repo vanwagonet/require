@@ -1,11 +1,11 @@
 /*!
- * _.require v0.9.2
+ * _.require v0.10
  *  Copyright 2010, Andy VanWagoner
  *  Released under the MIT, and BSD Licenses.
  **/
-(function(_) { _ = _ || window;
+(function(_, undefined) { _ = _ || window;
 	var obj_map = {}, ns_map = {}, root = [], reqs = {}, q = [], empty = function(){},
-		REQUESTED = 1, LOADED = 2, EXECUTED = 3, COMPLETE = 4,
+		REQUESTED = 1, LOADED = 2, EXECUTED = 3, COMPLETE = 4, initproto = false,
 		is_url = /:|#|\?|\/|\.(?:css|js|gif|jpe?g|png)$/i, is_css = /\.css$/i, is_img = /\.(?:gif|jpe?g|png)$/i,
 		inOrder = !!(window.opera || document.getBoxObjectFor || window.mozInnerScreenX >= 0),
 		d = document, head = d.head || d.getElementsByTagName('head')[0] || d.documentElement;
@@ -104,8 +104,8 @@
 
 	function require(arr, onready) {
 		if (typeof arr === 'string') { arr = [ arr ]; } // make sure we have an array
-		var left = arr.length; if (!left && onready) { return onready.apply(_, get(arr)); }
-		function check() { if (!--left && onready) { onready.apply(_, get(arr)); } }
+		var left = arr.length; if (!left && onready) { return onready.apply(_, findAll(arr)); }
+		function check() { if (!--left && onready) { onready.apply(_, findAll(arr)); } }
 		return each(arr, function(req) { return req.request(check); });
 	} _.require = require;
 
@@ -121,16 +121,19 @@
 		return used.reverse().join('/') + '.js';
 	} require.resolve = resolve;
 
-	function get(names) {
-		var objs = [], k, n = names.length;
-		for (k = 0; k < n; ++k) {
-			if (is_url.test(names[k])) { continue; }
-			var o = window, a = names[k].split('.'), i, l = a.length;
-			for (i = 0; i < l && o; ++i) { o = o[a[i]]; }
-			objs[k] = (i === l) ? o : undefined;
-		}
+	function findAll(names) { // resolve an array of strings to objects
+		var objs = [], i, l = names.length;
+		for (i = 0; i < l; ++i) { objs[i] = find(names[i]); }
 		return objs;
-	}
+	} require.findAll = findAll;
+
+	function find(name, create) { // resolve string to object
+		if (typeof name !== 'string') { return name; }
+		if (is_url.test(name)) { return undefined; }
+		var o = window, a = name.split('.'), i, l = a.length;
+		for (i = 0; i < l && o; ++i) { o = o[a[i]] || create && (o[a[i]] = {}); }
+		return (i === l) ? o : undefined;
+	} require.find = find;
 
 	var div; (div = d.createElement('div')).innerHTML = '<a></a>';
 	function absolutize(url) { // relative to absolute url
@@ -167,5 +170,36 @@
 
 	require.tree  = root; // make the required tree available
 	require.build = 0;    // used to bust cache when a new site build occurs
+
+	/** async class system with requiring and auto resolving names to objects
+	 * o.base: String || Function - The base class or name of base class,
+	 * o.requires: String || Array - Names or Objects required before defining */
+	function declare(name, o, onready) {
+		require(o.requires || [], function build_class() { // load dependencies, then define class
+			var BaseClass = find(o.base) || declare.base || Object, proto, p, i, l;
+
+			initproto = true; proto = new BaseClass(); initproto = false; // Create the prototype
+
+			for (p in o) { proto[p] = o[p]; } // Add new members
+			proto.base = BaseClass; // so you don't need to hardcode super() calls
+
+			function Class() { // Create the class
+				return (!initproto && this.initialize) ? this.initialize.apply(this, arguments) : this;
+			} Class.prototype = proto;
+
+			name = name.split('.'); // Attach to namespace (create if necessary)
+			var ns = find(name.slice(0, -1).join('.'), true);
+			Class.className = name.slice(-1)[0];
+			ns[Class.className] = Class;
+
+			if (typeof onready === 'function') { onready(Class); } // call ready handler
+		});
+
+		return _;
+	} require.declare = (_.declare = declare);
+
+	declare.base = function base(){ return this; };
+
+	return require;
 })(window); // pass in namespace
 
