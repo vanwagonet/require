@@ -112,13 +112,13 @@
 	function resolve(name) { // get url for object by name, pass through urls
 		if (is_url.test(name)) { return name; } // css and img should always be urls
 		if (obj_map[name]) { return obj_map[name](name); }
-		var parts = name.split('.'), used = [ parts.pop() ], ns;
+		var parts = name.split('.'), ns;
 		while (parts.length) {
 			if (ns_map[ns = parts.join('.')]) { return ns_map[ns](name); }
-			used.push(parts.pop());
+			parts.pop();
 		}
 		if (ns_map['']) { return ns_map[''](name); }
-		return used.reverse().join('/') + '.js';
+		return name.split('.').join('/') + '.js';
 	} require.resolve = resolve;
 
 	function findAll(names) { // resolve an array of strings to objects
@@ -175,7 +175,7 @@
 	 * o.base: String || Function - The base class or name of base class,
 	 * o.requires: String || Array - Names or Objects required before defining */
 	function declare(name, o, onready) {
-		require(o.requires || [], function build_class() { // load dependencies, then define class
+		return require(o.requires || [], function build_class() { // load dependencies, then define class
 			var BaseClass = find(o.base) || declare.base || Object, proto, p, i, l;
 
 			initproto = true; proto = new BaseClass(); initproto = false; // Create the prototype
@@ -194,12 +194,7 @@
 
 			if (typeof onready === 'function') { onready(Class); } // call ready handler
 		});
-
-		return _;
 	} require.declare = (_.declare = declare);
-
 	declare.base = function base(){ return this; };
-
-	return require;
 })(window); // pass in namespace
 
