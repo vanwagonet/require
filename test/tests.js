@@ -15,8 +15,11 @@
 	createTest('initialize').assert(true);
 
 	// test name to url resolution
-	require.addObjMap({ 'test.resolve.fn':function(n) { return 'fn'; }, 'test.resolve.url':'url' });
-	require.addNsMap({ 'test.resolve':function(n) { return 'ns/' + n + '.js'; } });
+	require.addObjMap({
+		'test.resolve.fn':function(n) { return 'fn'; },
+		'test.resolve.url':'url',
+		'test.resolve':function(n) { return 'ns/' + n + '.js'; }
+	});
 	createTest('resolve name by string').assert(require.resolve('test.resolve.url') === 'url');
 	createTest('resolve name by function').assert(require.resolve('test.resolve.fn') === 'fn');
 	createTest('resolve name by namespace function 1').assert(require.resolve('test.resolve.js.name') === 'ns/test.resolve.js.name.js');
