@@ -20,7 +20,7 @@ main file:
 	require.setObjUrl('jQuery', function(name) {
 		return name === 'jQuery' ? 'http://code.jquery.com/jquery-1.5.2.min.js' :
 			'http://cdn-' + (name.length % 4) + '.example/plugins/' + name + '.js'; });
-	require('jQuery.myplugin', function(myplugin) { /* both have loaded when this executes */ })
+	require('jQuery.myplugin', function(myplugin) { /* both have loaded when this executes */ });
 
 plugin file:
 
